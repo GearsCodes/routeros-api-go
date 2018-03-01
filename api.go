@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"strings"
+	"time"
 )
 
 // A reply can contain multiple pairs. A pair is a string key->value.
@@ -51,12 +52,12 @@ func GetPairVal(pairs []Pair, key string) (string, error) {
 type Client struct {
 	// Network Address.
 	// E.g. "10.0.0.1:8728" or "router.example.com:8728"
-	address  string
-	user     string
-	password string
-	debug    bool     // debug logging enabled
-	ready    bool     // Ready for work (login ok and connection not terminated)
-	conn     net.Conn // Connection to pass around
+	address   string
+	user      string
+	password  string
+	debug     bool     // debug logging enabled
+	ready     bool     // Ready for work (login ok and connection not terminated)
+	conn      net.Conn // Connection to pass around
 	TLSConfig *tls.Config
 }
 
@@ -102,14 +103,20 @@ func (c *Client) Close() {
 	c.conn.Close()
 }
 
-func (c *Client) Connect(user string, password string) error {
+func (c *Client) Connect(user string, password string, timeout time.Duration) error {
 
 	var err error
 	if c.TLSConfig != nil {
-		c.conn, err = tls.Dial("tcp", c.address, c.TLSConfig)
+		dialer := net.Dialer{Timeout: timeout}
+		c.conn, err = tls.DialWithDialer(&dialer, "tcp", c.address, c.TLSConfig)
 	} else {
-		c.conn, err = net.Dial("tcp", c.address)
+		c.conn, err = net.DialTimeout("tcp", c.address, timeout)
 	}
+	// if c.TLSConfig != nil {
+	// 	c.conn, err = tls.Dial("tcp", c.address, c.TLSConfig)
+	// } else {
+	// 	c.conn, err = net.Dial("tcp", c.address)
+	// }
 	if err != nil {
 		return err
 	}
