@@ -124,6 +124,44 @@ func (c *Client) Connect(user string, password string, timeout time.Duration) er
 	if err != nil {
 		return err
 	}
+	var loginParams []Pair
+	loginParams = append(loginParams, *NewPair("name", user))
+	loginParams = append(loginParams, *NewPair("password", password))
+
+	// try to log in again with challenge/response
+	res, err := c.Call("/login", loginParams)
+	if err != nil {
+		return err
+	}
+
+	if len(res.Pairs) > 0 {
+		return fmt.Errorf("Unexpected result on login: %+v", res)
+	}
+
+	return nil
+}
+
+func (c *Client) ConnectLegacy(user string, password string, timeout time.Duration) error {
+
+	var err error
+	if c.TLSConfig != nil {
+		dialer := net.Dialer{Timeout: timeout}
+		c.conn, err = tls.DialWithDialer(&dialer, "tcp", c.address, c.TLSConfig)
+	} else {
+		c.conn, err = net.DialTimeout("tcp", c.address, timeout)
+	}
+	if err != nil {
+		return err
+	}
+	// if c.TLSConfig != nil {
+	// 	c.conn, err = tls.Dial("tcp", c.address, c.TLSConfig)
+	// } else {
+	// 	c.conn, err = net.Dial("tcp", c.address)
+	// }
+	err = c.conn.SetDeadline(time.Now().Add(timeout))
+	if err != nil {
+		return err
+	}
 
 	// try to log in
 	res, err := c.Call("/login", nil)
